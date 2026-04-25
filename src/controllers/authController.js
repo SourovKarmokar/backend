@@ -223,3 +223,50 @@ exports.refreshToken = async (req, res) => {
     res.status(403).json({ message: "Invalid or expired token" });
   }
 };
+
+exports.logout = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    // যদি token না থাকে
+    if (!refreshToken) {
+      return res.status(200).json({
+        success: true,
+        message: "Already logged out",
+      });
+    }
+
+    // user খোঁজা
+    const user = await User.findOne({
+      refreshTokens: { $elemMatch: { token: refreshToken } },
+    });
+
+    // user থাকলে token remove
+    if (user) {
+      user.refreshTokens = user.refreshTokens.filter(
+        (rt) => rt.token !== refreshToken // ✅ correct
+      );
+
+      await user.save();
+    }
+
+    // cookie clear
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("Logout error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server error during logout",
+    });
+  }
+};
