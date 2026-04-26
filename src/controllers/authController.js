@@ -4,6 +4,7 @@ const VerificationToken = require("../models/verificationToken");
 const { validationResult } = require("express-validator");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
+const { success } = require("zod");
 
 exports.register = async (req, res) => {
   try {
@@ -306,6 +307,92 @@ exports.logoutAll = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error during logout from all devices",
+    });
+  }
+};
+
+exports.registerVendor = async (req, res) => {
+  try {
+    // 🔥 validate data
+    const validateData = vendorValidationSchema.parse(req.body);
+
+    const {
+      name,
+      email,
+      password,
+      phone,
+      shopName,
+      shopDescription,
+      shopAddress,
+      nidNumber,
+      bankInfo,
+    } = validateData;
+
+    // 🔍 Check duplicate email
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered. Please login.",
+      });
+    }
+
+    // 🔍 Check duplicate NID
+    if (nidNumber) {
+      const existingNid = await User.findOne({ nidNumber });
+      if (existingNid) {
+        return res.status(409).json({
+          success: false,
+          message: "NID already registered.",
+        });
+      }
+    }
+
+    // 🔐 Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 👤 Create user
+    const user = new User({
+      name,
+      email,
+      password: hashedPassword,
+      phone,
+      role: "vendor",
+      shopName,
+      shopDescription,
+      shopAddress,
+      nidNumber,
+      bankInfo,
+      // status auto সেট হবে pre-save middleware থেকে
+    });
+
+    await user.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Vendor registration successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    console.error("Register Vendor Error:", error);
+
+    // Zod error handle
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        success: false,
+        errors: error.issues,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
     });
   }
 };

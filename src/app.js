@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser")
 const authRouters = require("./routes/auth")
 const SwaggerUi = require("swagger-ui-express")
 const SwaggerSpecs = require('./config/swagger')
+const { apiLimiter } = require("./middlewares/rateLimiter")
 
 const app = express()
 
@@ -23,6 +24,7 @@ app.use(cookieParser())
 
 //Routes
 
+app.use('/api/v1' , apiLimiter)
 app.use('/api/v1/auth' , authRouters)
 
 // Not Found Route
