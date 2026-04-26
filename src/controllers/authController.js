@@ -270,3 +270,42 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
+exports.logoutAll = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // direct update (faster than find + save)
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { refreshTokens: [] },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // clear cookie
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out from all devices successfully",
+    });
+  } catch (error) {
+    console.error("LogoutAll error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error during logout from all devices",
+    });
+  }
+};
