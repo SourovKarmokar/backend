@@ -220,3 +220,109 @@ exports.getAllUsers = async (req, res) => {
     });
   }
 };
+
+
+exports.getAdminStats = async (req, res) => {
+  try {
+    const [
+      totalUsers,
+      totalCustomers,
+      vendorStats,
+      pendingVendors,
+      rejectedVendors,
+      approvedVendors,
+      suspendedVendors,
+    ] = await Promise.all([
+      // total users
+      User.countDocuments({}),
+
+      // total customers
+      User.countDocuments({ role: "customer" }),
+
+      // vendor aggregation
+      User.aggregate([
+        { $match: { role: "vendor" } },
+        {
+          $group: {
+            _id: null,
+            totalVendors: { $sum: 1 },
+
+            approved: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "approved"] }, 1, 0],
+              },
+            },
+
+            pending: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "pending"] }, 1, 0],
+              },
+            },
+
+            rejected: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "rejected"] }, 1, 0],
+              },
+            },
+
+            suspended: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "suspended"] }, 1, 0],
+              },
+            },
+          },
+        },
+      ]),
+
+      // counts
+      User.countDocuments({ role: "vendor", status: "pending" }),
+      User.countDocuments({ role: "vendor", status: "rejected" }),
+      User.countDocuments({ role: "vendor", status: "approved" }),
+      User.countDocuments({ role: "vendor", status: "suspended" }),
+    ]);
+
+    const vendorBreakdown = vendorStats[0] || {
+      totalVendors: 0,
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+      suspended: 0,
+    };
+
+    const stats = {
+      overview: {
+        totalUsers,
+        totalCustomers,
+        totalVendors: vendorBreakdown.totalVendors,
+      },
+
+      vendors: {
+        approved: vendorBreakdown.approved || approvedVendors,
+        pending: vendorBreakdown.pending || pendingVendors,
+        rejected: vendorBreakdown.rejected || rejectedVendors,
+        suspended: vendorBreakdown.suspended || suspendedVendors,
+      },
+
+      newRegistrationsToday: await User.countDocuments({
+        createdAt: {
+          $gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      }),
+
+      timestamp: new Date().toISOString(),
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: stats,
+    });
+
+  } catch (error) {
+    console.error("Admin stats error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
+  }
+};
