@@ -5,6 +5,7 @@ const cors = require("cors")
 const cookieParser = require("cookie-parser")
 
 const authRouters = require("./routes/auth")
+const adminRouters = require("./routes/admin")
 const SwaggerUi = require("swagger-ui-express")
 const SwaggerSpecs = require('./config/swagger')
 const { apiLimiter } = require("./middlewares/rateLimiter")
@@ -26,6 +27,7 @@ app.use(cookieParser())
 
 app.use('/api/v1' , apiLimiter)
 app.use('/api/v1/auth' , authRouters)
+app.use('/api/v1/admin' , adminRouters)
 
 // Not Found Route
 app.use((req, res, next) => {
